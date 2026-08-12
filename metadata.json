@@ -1,0 +1,6 @@
+{
+  "name": "Studio Gizmo - Portfólio Profissional e Painel Admin",
+  "description": "Portfólio do Studio Gizmo para Direção de Arte, Design, Marketing e Tecnologia/IA com painel administrativo completo e gerenciamento em tempo real.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-dark: #050505;
+    --accent-gold: #c5a47e;
+    --accent-gold-hover: #b3926c;
+  }
+
+  html, body {
+    background-color: #050505;
+    color: #f9f9f9;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  h1, h2, h3, .font-serif {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+  }
+}
+
+/* Custom scrollbar for sophisticated dark aesthetic */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #050505;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(197, 164, 126, 0.2);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(197, 164, 126, 0.4);
+}
+
+/* Custom Gold Gradient & Glow Utilities */
+.bg-gold-gradient {
+  background: linear-gradient(135deg, #c5a47e 0%, #e0c8aa 50%, #b3926c 100%);
+}
+
+.text-gold-gradient {
+  background: linear-gradient(135deg, #f3e5d8 0%, #c5a47e 50%, #a88358 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.border-gold-subtle {
+  border-color: rgba(197, 164, 126, 0.2);
+}
+
+.gold-glow {
+  box-shadow: 0 0 35px -5px rgba(197, 164, 126, 0.15);
+}
+
