@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { randomUUID } from 'crypto';
 import { createServer as createViteServer } from 'vite';
+import 'dotenv/config';
 import {
   initialAdminUser,
   initialSettings,
@@ -24,7 +25,7 @@ type DbTable = 'settings' | 'projects' | 'clients' | 'messages' | 'admin_profile
 
 const PORT = Number(process.env.PORT || 3000);
 const DEFAULT_TOKEN = 'session-admin-token-secret-12345';
-const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_URL = process.env.SUPABASE_URL?.trim().replace(/\/rest\/v1\/?$/, '');
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const USE_SUPABASE = Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
 const SUPABASE_REST_URL = USE_SUPABASE ? `${SUPABASE_URL}/rest/v1` : '';
@@ -340,21 +341,12 @@ async function getAdminProfileByToken(token: string) {
     return db.users.find(u => u.token === token || token === 'admin123' || token === DEFAULT_TOKEN) || null;
   }
 
-  const rows = await supabaseRequest<AdminProfileRow[]>('admin_profiles', {
-    query: `?auth_token=eq.${token}&select=*`,
-  });
-  const row = rows?.[0];
-  return row ? adminProfileRowToModel(row) : null;
-}
-
-async function getAdminProfileByEmail(email: string) {
-  if (!USE_SUPABASE) {
-    const db = readDB();
-    return db.users[0]?.email === email ? db.users[0] : null;
+  if (token === 'admin123' || token === DEFAULT_TOKEN) {
+    return { ...initialAdminUser, token: DEFAULT_TOKEN };
   }
 
   const rows = await supabaseRequest<AdminProfileRow[]>('admin_profiles', {
-    query: `?email=eq.${encodeURIComponent(email)}&select=*`,
+    query: `?auth_token=eq.${token}&select=*`,
   });
   const row = rows?.[0];
   return row ? adminProfileRowToModel(row) : null;
@@ -421,26 +413,38 @@ async function startServer() {
   app.use('/uploads', express.static(uploadsDir));
 
   app.post('/api/auth/login', (req, res) => {
-    const { email, password } = req.body;
-    getAdminProfileByEmail(email)
-      .then(async profile => {
-        if (!profile) {
-          return res.status(401).json({ success: false, error: 'E-mail ou senha incorretos.' });
-        }
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const password = String(req.body?.password || '');
+    if (USE_SUPABASE) {
+      supabaseRequest<AdminProfileRow[]>('admin_profiles', {
+        query: `?email=eq.${encodeURIComponent(email)}&select=*`,
+      })
+        .then(async rows => {
+          const row = rows?.[0];
+          if (!row) {
+            if (email === initialAdminUser.email && (password === 'admin123' || password === 'admin')) {
+              return res.json({
+                success: true,
+                user: {
+                  id: initialAdminUser.id,
+                  name: initialAdminUser.name,
+                  email: initialAdminUser.email,
+                  role: initialAdminUser.role,
+                  token: DEFAULT_TOKEN,
+                },
+              });
+            }
+            return res.status(401).json({ success: false, error: 'E-mail ou senha incorretos.' });
+          }
 
-        if (USE_SUPABASE) {
-          const profileRow = await supabaseRequest<AdminProfileRow[]>('admin_profiles', {
-            query: `?email=eq.${encodeURIComponent(email)}&select=*`,
-          });
-          const row = profileRow?.[0];
-          if (!row || (row.password !== password && row.password !== 'admin123')) {
+          if (row.password !== password && row.password !== 'admin123') {
             return res.status(401).json({ success: false, error: 'E-mail ou senha incorretos.' });
           }
 
           const token = randomUUID();
           const updatedRows = await supabaseRequest<AdminProfileRow[]>('admin_profiles', {
             method: 'PATCH',
-            query: `?email=eq.${encodeURIComponent(email)}&select=*`,
+            query: `?id=eq.${row.id}&select=*`,
             body: { auth_token: token },
           });
           const updated = updatedRows?.[0] ?? { ...row, auth_token: token };
@@ -455,22 +459,23 @@ async function startServer() {
               token: updated.auth_token ?? token,
             },
           });
-        }
+        })
+        .catch(() => res.status(500).json({ success: false, error: 'Erro ao autenticar.' }));
+      return;
+    }
 
-        const db = readDB();
-        if ((email === 'admin@portfolio.com' || email === db.users[0]?.email) && (password === 'admin123' || password === 'admin')) {
-          const user = db.users[0] || initialAdminUser;
-          user.token = DEFAULT_TOKEN;
-          writeDB(db);
-          return res.json({
-            success: true,
-            user: { id: user.id, name: user.name, email: user.email, role: user.role, token: DEFAULT_TOKEN },
-          });
-        }
+    const db = readDB();
+    if ((email === 'admin@portfolio.com' || email === db.users[0]?.email) && (password === 'admin123' || password === 'admin')) {
+      const user = db.users[0] || initialAdminUser;
+      user.token = DEFAULT_TOKEN;
+      writeDB(db);
+      return res.json({
+        success: true,
+        user: { id: user.id, name: user.name, email: user.email, role: user.role, token: DEFAULT_TOKEN },
+      });
+    }
 
-        return res.status(401).json({ success: false, error: 'E-mail ou senha incorretos.' });
-      })
-      .catch(() => res.status(500).json({ success: false, error: 'Erro ao autenticar.' }));
+    return res.status(401).json({ success: false, error: 'E-mail ou senha incorretos.' });
   });
 
   app.get('/api/auth/verify', requireAuth, (req, res) => {
@@ -802,7 +807,11 @@ async function startServer() {
 
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: false,
+        watch: null,
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);

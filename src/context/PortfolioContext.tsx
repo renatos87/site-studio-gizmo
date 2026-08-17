@@ -140,10 +140,11 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   const loginAdmin = async (email: string, pass: string): Promise<boolean> => {
     try {
+      const normalizedEmail = email.trim().toLowerCase();
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password: pass }),
+        body: JSON.stringify({ email: normalizedEmail, password: pass }),
       });
       const data = await res.json();
       if (data.success && data.user) {
