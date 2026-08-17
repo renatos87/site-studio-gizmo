@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { initialClients, initialProjects, initialSettings } from '../../src/data/initialData';
-import { Client, Project, SiteSettings } from '../../src/types';
+import { initialClients, initialProjects, initialSettings } from '../_shared/initialData';
+import type { Client, Project, SiteSettings } from '../../src/types';
 
 function sortProjects(projects: Project[]) {
   return [...projects].sort((a, b) => a.sortOrder - b.sortOrder);
