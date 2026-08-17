@@ -44,7 +44,7 @@ export const Navbar: React.FC = () => {
               {settings.appearance?.logoText || settings.personalInfo?.name || 'STUDIO GIZMO'}
             </span>
             <span className="text-[10px] tracking-[0.2em] uppercase font-medium text-[#c5a47e]/80">
-              Art & Tech Director
+              Marketing Digital e Gestão de IA
             </span>
           </div>
         </button>
