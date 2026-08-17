@@ -589,8 +589,12 @@ export default async function handler(req: any, res: any) {
       }
 
       const db = readDB();
+      const beforeCount = db.projects.length;
       db.projects = db.projects.filter(p => p.id !== id);
       writeDB(db);
+      if (beforeCount === db.projects.length) {
+        return sendJson(res, 200, { success: true, message: 'Projeto não encontrado, mas a operação é considerada concluída.' });
+      }
       return sendJson(res, 200, { success: true, message: 'Projeto excluído com sucesso.' });
     }
 
@@ -811,7 +815,11 @@ export default async function handler(req: any, res: any) {
         return sendJson(res, 400, { error: 'Formato de base64 inválido.' });
       }
 
-      return sendJson(res, 501, { error: 'Upload local não é suportado em Serverless; use URLs ou Supabase Storage.' });
+      return sendJson(res, 200, {
+        success: true,
+        url: image,
+        message: 'Imagem mantida inline como data URL.',
+      });
     }
 
     return sendJson(res, 404, { error: 'Rota não encontrada.' });
