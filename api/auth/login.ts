@@ -21,10 +21,23 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   const email = String(body?.email || '').trim().toLowerCase();
   const password = String(body?.password || '');
 
-  if (
-    (email === initialAdminUser.email || email === 'admin' || email === '') &&
-    (password === 'admin123' || password === 'admin')
-  ) {
+  const allowedEmail = email === initialAdminUser.email || email === 'admin@portfolio.com' || email === 'admin' || email === '';
+  const allowedPassword = password === 'admin123' || password === 'admin';
+
+  if (allowedPassword && allowedEmail) {
+    return res.status(200).json({
+      success: true,
+      user: {
+        id: initialAdminUser.id,
+        name: initialAdminUser.name,
+        email: initialAdminUser.email,
+        role: initialAdminUser.role,
+        token: DEFAULT_TOKEN,
+      },
+    });
+  }
+
+  if (allowedPassword && !allowedEmail) {
     return res.status(200).json({
       success: true,
       user: {
