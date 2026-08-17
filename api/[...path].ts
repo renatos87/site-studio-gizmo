@@ -291,6 +291,32 @@ async function supabaseRequest<T>(
   return (await response.json()) as T;
 }
 
+async function deleteSupabaseRow(table: DbTable, id: string) {
+  if (!USE_SUPABASE) return { success: false as const };
+
+  try {
+    const response = await fetch(`${SUPABASE_REST_URL}/${table}?id=eq.${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: {
+        apikey: SUPABASE_SERVICE_ROLE_KEY!,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY!}`,
+        Prefer: 'return=minimal',
+      },
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      console.error(`Delete from ${table} failed (${response.status}):`, text);
+      return { success: false as const, status: response.status, error: text };
+    }
+
+    return { success: true as const };
+  } catch (error) {
+    console.error(`Delete from ${table} threw:`, error);
+    return { success: false as const, status: 500, error: String(error) };
+  }
+}
+
 async function getSupabaseState() {
   if (!USE_SUPABASE) return null;
 
@@ -584,7 +610,10 @@ export default async function handler(req: any, res: any) {
       if (!auth) return;
       const id = segments[1];
       if (USE_SUPABASE) {
-        await supabaseRequest('projects', { method: 'DELETE', query: `?id=eq.${id}` });
+        const deleted = await deleteSupabaseRow('projects', id);
+        if (!deleted.success && deleted.status !== 404) {
+          return sendJson(res, 500, { error: 'Erro ao excluir projeto.', details: deleted.error });
+        }
         return sendJson(res, 200, { success: true, message: 'Projeto excluído com sucesso.' });
       }
 
@@ -697,7 +726,10 @@ export default async function handler(req: any, res: any) {
       if (!auth) return;
       const id = segments[1];
       if (USE_SUPABASE) {
-        await supabaseRequest('clients', { method: 'DELETE', query: `?id=eq.${id}` });
+        const deleted = await deleteSupabaseRow('clients', id);
+        if (!deleted.success && deleted.status !== 404) {
+          return sendJson(res, 500, { error: 'Erro ao excluir cliente.', details: deleted.error });
+        }
         return sendJson(res, 200, { success: true, message: 'Cliente excluído com sucesso.' });
       }
 
@@ -778,7 +810,10 @@ export default async function handler(req: any, res: any) {
       if (!auth) return;
       const id = segments[1];
       if (USE_SUPABASE) {
-        await supabaseRequest('messages', { method: 'DELETE', query: `?id=eq.${id}` });
+        const deleted = await deleteSupabaseRow('messages', id);
+        if (!deleted.success && deleted.status !== 404) {
+          return sendJson(res, 500, { error: 'Erro ao excluir mensagem.', details: deleted.error });
+        }
         return sendJson(res, 200, { success: true, message: 'Mensagem excluída.' });
       }
 
