@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { initialAdminUser } from '../../../../src/data/initialData';
+import { initialAdminUser } from '../../src/data/initialData';
 
 const DEFAULT_TOKEN = 'session-admin-token-secret-12345';
 
