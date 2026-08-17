@@ -6,8 +6,8 @@ import { usePortfolio } from '../../context/PortfolioContext';
 export const AdminLogin: React.FC = () => {
   const { loginAdmin, setActiveSection } = usePortfolio();
   
-  const [email, setEmail] = useState('admin@portfolio.com');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -28,8 +28,8 @@ export const AdminLogin: React.FC = () => {
   };
 
   const handleUseDemo = () => {
-    setEmail('admin@portfolio.com');
-    setPassword('admin123');
+    setEmail('');
+    setPassword('');
   };
 
   return (
@@ -62,7 +62,7 @@ export const AdminLogin: React.FC = () => {
         </div>
 
         {/* Demo Credentials Alert */}
-        <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 text-xs space-y-2">
+        {/* <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 text-xs space-y-2">
           <div className="flex items-center gap-2 font-bold text-[#c5a47e]">
             <Key className="w-4 h-4" />
             <span>Acesso de Teste Demonstrativo</span>
@@ -78,7 +78,7 @@ export const AdminLogin: React.FC = () => {
           >
             Preencher credenciais automáticas
           </button>
-        </div>
+        </div> */}
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
