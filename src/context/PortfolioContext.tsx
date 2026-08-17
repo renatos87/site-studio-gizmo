@@ -33,6 +33,7 @@ interface PortfolioContextType {
   deleteMessageById: (id: string) => Promise<boolean>;
   uploadImageFile: (base64OrFile: string) => Promise<string>;
   refreshAllData: () => Promise<void>;
+  apiAvailable: boolean;
 }
 
 const PortfolioContext = createContext<PortfolioContextType | undefined>(undefined);
@@ -49,6 +50,7 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [apiAvailable, setApiAvailable] = useState<boolean>(true);
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/$/, '') || '';
 
   const apiFetch = (path: string, init?: RequestInit) => {
@@ -112,12 +114,15 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
   const refreshAllData = async () => {
     try {
       setIsLoading(true);
+      setApiAvailable(true);
       const res = await apiFetch('/api/public/all');
       if (res.ok) {
         const data = await res.json();
         if (data.settings) setSettings(data.settings);
         if (data.projects) setProjects(data.projects);
         if (data.clients) setClients(data.clients);
+      } else {
+        setApiAvailable(false);
       }
 
       const token = localStorage.getItem('admin_token');
@@ -128,12 +133,17 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
         ]);
         if (projRes.ok) {
           setProjects(await projRes.json());
+        } else {
+          setApiAvailable(false);
         }
         if (msgRes.ok) {
           setMessages(await msgRes.json());
+        } else {
+          setApiAvailable(false);
         }
       }
     } catch (err) {
+      setApiAvailable(false);
       console.warn('API error while loading portfolio data:', err);
     } finally {
       setIsLoading(false);
@@ -251,11 +261,19 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
-      if (!res.ok) return false;
+      if (!res.ok) {
+        if (res.status === 404) {
+          setProjects(prev => prev.filter(p => p.id !== id));
+          setApiAvailable(false);
+          showNotification('A API publicada não respondeu para exclusão. O item foi removido só da interface.', 'error');
+        }
+        return false;
+      }
       setProjects(prev => prev.filter(p => p.id !== id));
       showNotification('Projeto removido.');
       return true;
     } catch {
+      setApiAvailable(false);
       showNotification('Erro ao remover projeto.', 'error');
       return false;
     }
@@ -363,10 +381,14 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
         headers: getAuthHeaders(),
         body: JSON.stringify({ image: base64OrUrl }),
       });
-      if (!res.ok) return base64OrUrl;
+      if (!res.ok) {
+        setApiAvailable(false);
+        return base64OrUrl;
+      }
       const data = await res.json();
       return data.url || base64OrUrl;
     } catch {
+      setApiAvailable(false);
       return base64OrUrl;
     }
   };
@@ -404,6 +426,7 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
         deleteMessageById,
         uploadImageFile,
         refreshAllData,
+        apiAvailable,
       }}
     >
       {children}

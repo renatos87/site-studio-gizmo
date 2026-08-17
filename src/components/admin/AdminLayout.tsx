@@ -9,7 +9,7 @@ import { AdminMessages } from './AdminMessages';
 import { AdminSettings } from './AdminSettings';
 
 export const AdminLayout: React.FC = () => {
-  const { adminUser, logoutAdmin, setActiveSection, theme, toggleTheme, messages } = usePortfolio();
+  const { adminUser, logoutAdmin, setActiveSection, theme, toggleTheme, messages, apiAvailable } = usePortfolio();
   
   const [activeTab, setActiveTab] = useState<'dashboard' | 'projects' | 'clients' | 'messages' | 'settings'>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -128,6 +128,12 @@ export const AdminLayout: React.FC = () => {
       {/* Main Admin Content Area */}
       <main className="flex-1 p-4 sm:p-8 lg:p-10 overflow-y-auto">
         <div className="max-w-6xl mx-auto">
+          {!apiAvailable && (
+            <div className="mb-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+              O backend não respondeu neste ambiente. As ações de salvar, excluir e upload podem não persistir até a API estar ativa.
+            </div>
+          )}
+
           {activeTab === 'dashboard' && (
             <AdminDashboard
               onNavigateTab={tab => setActiveTab(tab as any)}
