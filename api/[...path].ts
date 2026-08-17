@@ -8,8 +8,8 @@ import {
   initialClients,
   initialProjects,
   initialMessages,
-} from '../src/data/initialData';
-import { Project, Client, ContactMessage, SiteSettings, User } from '../src/types';
+} from './_shared/initialData.js';
+import type { Project, Client, ContactMessage, SiteSettings, User } from '../src/types';
 
 interface DBData {
   users: User[];
