@@ -20,13 +20,9 @@ interface PortfolioContextType {
   isLoading: boolean;
   notification: { type: 'success' | 'error'; message: string } | null;
   showNotification: (message: string, type?: 'success' | 'error') => void;
-  
-  // Actions
   loginAdmin: (email: string, pass: string) => Promise<boolean>;
   logoutAdmin: () => void;
   submitContactForm: (data: { name: string; email: string; phone?: string; company?: string; subject?: string; message: string }) => Promise<{ success: boolean; message: string }>;
-  
-  // Admin CRUD
   saveSiteSettings: (newSettings: SiteSettings) => Promise<boolean>;
   saveProject: (project: Partial<Project>) => Promise<boolean>;
   deleteProjectById: (id: string) => Promise<boolean>;
@@ -54,7 +50,6 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  // Initialize Theme from localStorage or settings
   useEffect(() => {
     const savedTheme = localStorage.getItem('portfolio_theme') as 'dark' | 'light';
     if (savedTheme) {
@@ -83,16 +78,18 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
     setTimeout(() => setNotification(null), 4000);
   };
 
-  // Helper auth headers
   const getAuthHeaders = () => {
-    const token = adminUser?.token || localStorage.getItem('admin_token') || 'session-admin-token-secret-12345';
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    };
+    const token = adminUser?.token || localStorage.getItem('admin_token');
+    return token
+      ? {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        }
+      : {
+          'Content-Type': 'application/json',
+        };
   };
 
-  // Load Admin user from localStorage
   useEffect(() => {
     const token = localStorage.getItem('admin_token');
     if (token) {
@@ -106,7 +103,6 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
     }
   }, []);
 
-  // Fetch Public Data from Backend API
   const refreshAllData = async () => {
     try {
       setIsLoading(true);
@@ -117,8 +113,7 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
         if (data.projects) setProjects(data.projects);
         if (data.clients) setClients(data.clients);
       }
-      
-      // If admin, fetch all projects (including drafts) & messages
+
       const token = localStorage.getItem('admin_token');
       if (token) {
         const [projRes, msgRes] = await Promise.all([
@@ -126,16 +121,14 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
           fetch('/api/messages', { headers: getAuthHeaders() }),
         ]);
         if (projRes.ok) {
-          const allProjects = await projRes.json();
-          setProjects(allProjects);
+          setProjects(await projRes.json());
         }
         if (msgRes.ok) {
-          const allMessages = await msgRes.json();
-          setMessages(allMessages);
+          setMessages(await msgRes.json());
         }
       }
     } catch (err) {
-      console.warn('API error, using local fallback data:', err);
+      console.warn('API error while loading portfolio data:', err);
     } finally {
       setIsLoading(false);
     }
@@ -145,7 +138,6 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
     refreshAllData();
   }, [adminUser]);
 
-  // Login Admin
   const loginAdmin = async (email: string, pass: string): Promise<boolean> => {
     try {
       const res = await fetch('/api/auth/login', {
@@ -160,31 +152,16 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
         showNotification('Login efetuado com sucesso!');
         await refreshAllData();
         return true;
-      } else {
-        showNotification(data.error || 'Credenciais inválidas.', 'error');
-        return false;
       }
-    } catch (err) {
-      // Offline / Local fallback login
-      if ((email === 'admin@portfolio.com' || email === 'admin') && (pass === 'admin123' || pass === 'admin')) {
-        const fakeUser: User = {
-          id: 'usr-1',
-          name: 'Gabriel Costa',
-          email: 'admin@portfolio.com',
-          role: 'admin',
-          token: 'session-admin-token-secret-12345',
-        };
-        setAdminUser(fakeUser);
-        localStorage.setItem('admin_token', fakeUser.token);
-        showNotification('Login efetuado no modo administrativo!');
-        return true;
-      }
+
+      showNotification(data.error || 'Credenciais inválidas.', 'error');
+      return false;
+    } catch {
       showNotification('Erro ao conectar ao servidor de autenticação.', 'error');
       return false;
     }
   };
 
-  // Logout Admin
   const logoutAdmin = () => {
     setAdminUser(null);
     localStorage.removeItem('admin_token');
@@ -195,7 +172,6 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
     refreshAllData();
   };
 
-  // Submit Contact Form
   const submitContactForm = async (data: { name: string; email: string; phone?: string; company?: string; subject?: string; message: string }) => {
     try {
       const res = await fetch('/api/messages', {
@@ -206,32 +182,18 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
       const result = await res.json();
       if (res.ok && result.success) {
         showNotification('Sua mensagem foi enviada com sucesso! Entrarei em contato em breve.');
-        refreshAllData();
+        await refreshAllData();
         return { success: true, message: 'Mensagem enviada com sucesso!' };
-      } else {
-        showNotification(result.error || 'Erro ao enviar mensagem.', 'error');
-        return { success: false, message: result.error || 'Erro ao enviar mensagem.' };
       }
-    } catch (err) {
-      // Local fallback insert
-      const newMsg: ContactMessage = {
-        id: 'msg-' + Date.now(),
-        name: data.name || '',
-        email: data.email || '',
-        phone: data.phone || '',
-        company: data.company || '',
-        subject: data.subject || 'Contato',
-        message: data.message || '',
-        status: 'unread',
-        createdAt: new Date().toISOString(),
-      };
-      setMessages(prev => [newMsg, ...prev]);
-      showNotification('Sua mensagem foi registrada localmente!');
-      return { success: true, message: 'Mensagem enviada com sucesso!' };
+
+      showNotification(result.error || 'Erro ao enviar mensagem.', 'error');
+      return { success: false, message: result.error || 'Erro ao enviar mensagem.' };
+    } catch {
+      showNotification('Erro ao conectar ao servidor de mensagens.', 'error');
+      return { success: false, message: 'Erro ao enviar mensagem.' };
     }
   };
 
-  // Save Site Settings
   const saveSiteSettings = async (newSettings: SiteSettings): Promise<boolean> => {
     try {
       const res = await fetch('/api/settings', {
@@ -239,96 +201,59 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
         headers: getAuthHeaders(),
         body: JSON.stringify(newSettings),
       });
-      if (res.ok) {
-        const updated = await res.json();
-        setSettings(updated);
-        showNotification('Configurações atualizadas com sucesso!');
-        return true;
-      }
-      return false;
-    } catch (err) {
-      setSettings(newSettings);
-      showNotification('Configurações salvas localmente!');
+      if (!res.ok) return false;
+      setSettings(await res.json());
+      showNotification('Configurações atualizadas com sucesso!');
       return true;
+    } catch {
+      showNotification('Erro ao salvar configurações.', 'error');
+      return false;
     }
   };
 
-  // Save or Update Project
   const saveProject = async (projectData: Partial<Project>): Promise<boolean> => {
     try {
       const isEdit = !!projectData.id;
       const url = isEdit ? `/api/projects/${projectData.id}` : '/api/projects';
       const method = isEdit ? 'PUT' : 'POST';
-
       const res = await fetch(url, {
         method,
         headers: getAuthHeaders(),
         body: JSON.stringify(projectData),
       });
+      if (!res.ok) return false;
 
-      if (res.ok) {
-        const saved = await res.json();
-        if (isEdit) {
-          setProjects(prev => prev.map(p => p.id === saved.id ? saved : p));
-        } else {
-          setProjects(prev => [saved, ...prev]);
-        }
-        showNotification(`Projeto ${isEdit ? 'atualizado' : 'criado'} com sucesso!`);
-        refreshAllData();
-        return true;
-      }
-      return false;
-    } catch (err) {
-      // Local fallback
-      if (projectData.id) {
-        setProjects(prev => prev.map(p => p.id === projectData.id ? { ...p, ...projectData } as Project : p));
+      const saved = await res.json();
+      if (isEdit) {
+        setProjects(prev => prev.map(p => (p.id === saved.id ? saved : p)));
       } else {
-        const newProj: Project = {
-          id: 'proj-' + Date.now(),
-          title: projectData.title || 'Novo Projeto',
-          slug: projectData.slug || 'novo-projeto',
-          category: projectData.category || 'Branding',
-          year: projectData.year || '2026',
-          description: projectData.description || '',
-          objective: projectData.objective || '',
-          solution: projectData.solution || '',
-          coverImage: projectData.coverImage || 'https://picsum.photos/800/600',
-          galleryImages: projectData.galleryImages || [],
-          tags: projectData.tags || [],
-          sortOrder: projects.length + 1,
-          status: projectData.status || 'published',
-          featured: !!projectData.featured,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        setProjects(prev => [newProj, ...prev]);
+        setProjects(prev => [saved, ...prev]);
       }
-      showNotification('Projeto salvo com sucesso!');
+      showNotification(`Projeto ${isEdit ? 'atualizado' : 'criado'} com sucesso!`);
+      await refreshAllData();
       return true;
+    } catch {
+      showNotification('Erro ao salvar projeto.', 'error');
+      return false;
     }
   };
 
-  // Delete Project
   const deleteProjectById = async (id: string): Promise<boolean> => {
     try {
       const res = await fetch(`/api/projects/${id}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
-      if (res.ok) {
-        setProjects(prev => prev.filter(p => p.id !== id));
-        showNotification('Projeto removido.');
-        return true;
-      }
-      return false;
-    } catch (err) {
+      if (!res.ok) return false;
       setProjects(prev => prev.filter(p => p.id !== id));
       showNotification('Projeto removido.');
       return true;
+    } catch {
+      showNotification('Erro ao remover projeto.', 'error');
+      return false;
     }
   };
 
-  // Reorder Projects
   const reorderProjectsList = async (orderedIds: string[]): Promise<boolean> => {
     try {
       const res = await fetch('/api/projects/reorder', {
@@ -336,87 +261,59 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
         headers: getAuthHeaders(),
         body: JSON.stringify({ orderedIds }),
       });
-      if (res.ok) {
-        showNotification('Ordem dos projetos atualizada.');
-        refreshAllData();
-        return true;
-      }
-      return false;
-    } catch (err) {
-      showNotification('Ordem atualizada localmente.');
+      if (!res.ok) return false;
+      showNotification('Ordem dos projetos atualizada.');
+      await refreshAllData();
       return true;
+    } catch {
+      showNotification('Erro ao atualizar ordem dos projetos.', 'error');
+      return false;
     }
   };
 
-  // Save or Update Client
   const saveClient = async (clientData: Partial<Client>): Promise<boolean> => {
     try {
       const isEdit = !!clientData.id;
       const url = isEdit ? `/api/clients/${clientData.id}` : '/api/clients';
       const method = isEdit ? 'PUT' : 'POST';
-
       const res = await fetch(url, {
         method,
         headers: getAuthHeaders(),
         body: JSON.stringify(clientData),
       });
+      if (!res.ok) return false;
 
-      if (res.ok) {
-        const saved = await res.json();
-        if (isEdit) {
-          setClients(prev => prev.map(c => c.id === saved.id ? saved : c));
-        } else {
-          setClients(prev => [...prev, saved]);
-        }
-        showNotification(`Cliente ${isEdit ? 'atualizado' : 'cadastrado'} com sucesso!`);
-        refreshAllData();
-        return true;
-      }
-      return false;
-    } catch (err) {
-      if (clientData.id) {
-        setClients(prev => prev.map(c => c.id === clientData.id ? { ...c, ...clientData } as Client : c));
+      const saved = await res.json();
+      if (isEdit) {
+        setClients(prev => prev.map(c => (c.id === saved.id ? saved : c)));
       } else {
-        const newClient: Client = {
-          id: 'cli-' + Date.now(),
-          name: clientData.name || 'Novo Cliente',
-          slug: clientData.slug || 'novo-cliente',
-          logo: clientData.logo || 'https://picsum.photos/200/200',
-          segment: clientData.segment || 'Geral',
-          description: clientData.description || '',
-          status: clientData.status || 'active',
-          sortOrder: clients.length + 1,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        setClients(prev => [...prev, newClient]);
+        setClients(prev => [...prev, saved]);
       }
-      showNotification('Cliente salvo com sucesso!');
+      showNotification(`Cliente ${isEdit ? 'atualizado' : 'cadastrado'} com sucesso!`);
+      await refreshAllData();
       return true;
+    } catch {
+      showNotification('Erro ao salvar cliente.', 'error');
+      return false;
     }
   };
 
-  // Delete Client
   const deleteClientById = async (id: string): Promise<boolean> => {
     try {
       const res = await fetch(`/api/clients/${id}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
-      if (res.ok) {
-        setClients(prev => prev.filter(c => c.id !== id));
-        showNotification('Cliente removido.');
-        return true;
-      }
-      return false;
-    } catch (err) {
+      if (!res.ok) return false;
       setClients(prev => prev.filter(c => c.id !== id));
       showNotification('Cliente removido.');
       return true;
+    } catch {
+      showNotification('Erro ao remover cliente.', 'error');
+      return false;
     }
   };
 
-  // Update Message Status
   const updateMessageStatusById = async (id: string, status: ContactMessage['status']): Promise<boolean> => {
     try {
       const res = await fetch(`/api/messages/${id}`, {
@@ -424,56 +321,45 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
         headers: getAuthHeaders(),
         body: JSON.stringify({ status }),
       });
-      if (res.ok) {
-        setMessages(prev => prev.map(m => m.id === id ? { ...m, status } : m));
-        showNotification(`Status da mensagem atualizado para "${status}".`);
-        return true;
-      }
-      return false;
-    } catch (err) {
-      setMessages(prev => prev.map(m => m.id === id ? { ...m, status } : m));
-      showNotification('Status atualizado.');
+      if (!res.ok) return false;
+      setMessages(prev => prev.map(m => (m.id === id ? { ...m, status } : m)));
+      showNotification(`Status da mensagem atualizado para "${status}".`);
       return true;
+    } catch {
+      showNotification('Erro ao atualizar status da mensagem.', 'error');
+      return false;
     }
   };
 
-  // Delete Message
   const deleteMessageById = async (id: string): Promise<boolean> => {
     try {
       const res = await fetch(`/api/messages/${id}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
-      if (res.ok) {
-        setMessages(prev => prev.filter(m => m.id !== id));
-        showNotification('Mensagem excluída.');
-        return true;
-      }
-      return false;
-    } catch (err) {
+      if (!res.ok) return false;
       setMessages(prev => prev.filter(m => m.id !== id));
       showNotification('Mensagem excluída.');
       return true;
+    } catch {
+      showNotification('Erro ao excluir mensagem.', 'error');
+      return false;
     }
   };
 
-  // Upload Image File
   const uploadImageFile = async (base64OrUrl: string): Promise<string> => {
-    if (!base64OrUrl.startsWith('data:')) {
-      return base64OrUrl;
-    }
+    if (!base64OrUrl.startsWith('data:')) return base64OrUrl;
+
     try {
       const res = await fetch('/api/upload', {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ image: base64OrUrl }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        return data.url || base64OrUrl;
-      }
-      return base64OrUrl;
-    } catch (err) {
+      if (!res.ok) return base64OrUrl;
+      const data = await res.json();
+      return data.url || base64OrUrl;
+    } catch {
       return base64OrUrl;
     }
   };
