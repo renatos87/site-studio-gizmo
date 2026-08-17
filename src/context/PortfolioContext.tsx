@@ -49,6 +49,12 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/$/, '') || '';
+
+  const apiFetch = (path: string, init?: RequestInit) => {
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+    return fetch(`${apiBaseUrl}${normalizedPath}`, init);
+  };
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('portfolio_theme') as 'dark' | 'light';
@@ -106,7 +112,7 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
   const refreshAllData = async () => {
     try {
       setIsLoading(true);
-      const res = await fetch('/api/public/all');
+      const res = await apiFetch('/api/public/all');
       if (res.ok) {
         const data = await res.json();
         if (data.settings) setSettings(data.settings);
@@ -117,8 +123,8 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
       const token = localStorage.getItem('admin_token');
       if (token) {
         const [projRes, msgRes] = await Promise.all([
-          fetch('/api/projects', { headers: getAuthHeaders() }),
-          fetch('/api/messages', { headers: getAuthHeaders() }),
+          apiFetch('/api/projects', { headers: getAuthHeaders() }),
+          apiFetch('/api/messages', { headers: getAuthHeaders() }),
         ]);
         if (projRes.ok) {
           setProjects(await projRes.json());
@@ -141,7 +147,7 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
   const loginAdmin = async (email: string, pass: string): Promise<boolean> => {
     try {
       const normalizedEmail = email.trim().toLowerCase();
-      const res = await fetch('/api/auth/login', {
+      const res = await apiFetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: normalizedEmail, password: pass }),
@@ -175,7 +181,7 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   const submitContactForm = async (data: { name: string; email: string; phone?: string; company?: string; subject?: string; message: string }) => {
     try {
-      const res = await fetch('/api/messages', {
+      const res = await apiFetch('/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -197,7 +203,7 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   const saveSiteSettings = async (newSettings: SiteSettings): Promise<boolean> => {
     try {
-      const res = await fetch('/api/settings', {
+      const res = await apiFetch('/api/settings', {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify(newSettings),
@@ -217,7 +223,7 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
       const isEdit = !!projectData.id;
       const url = isEdit ? `/api/projects/${projectData.id}` : '/api/projects';
       const method = isEdit ? 'PUT' : 'POST';
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
         headers: getAuthHeaders(),
         body: JSON.stringify(projectData),
@@ -241,7 +247,7 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   const deleteProjectById = async (id: string): Promise<boolean> => {
     try {
-      const res = await fetch(`/api/projects/${id}`, {
+      const res = await apiFetch(`/api/projects/${id}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
@@ -257,7 +263,7 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   const reorderProjectsList = async (orderedIds: string[]): Promise<boolean> => {
     try {
-      const res = await fetch('/api/projects/reorder', {
+      const res = await apiFetch('/api/projects/reorder', {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ orderedIds }),
@@ -277,7 +283,7 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
       const isEdit = !!clientData.id;
       const url = isEdit ? `/api/clients/${clientData.id}` : '/api/clients';
       const method = isEdit ? 'PUT' : 'POST';
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
         headers: getAuthHeaders(),
         body: JSON.stringify(clientData),
@@ -301,7 +307,7 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   const deleteClientById = async (id: string): Promise<boolean> => {
     try {
-      const res = await fetch(`/api/clients/${id}`, {
+      const res = await apiFetch(`/api/clients/${id}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
@@ -317,7 +323,7 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   const updateMessageStatusById = async (id: string, status: ContactMessage['status']): Promise<boolean> => {
     try {
-      const res = await fetch(`/api/messages/${id}`, {
+      const res = await apiFetch(`/api/messages/${id}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify({ status }),
@@ -334,7 +340,7 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   const deleteMessageById = async (id: string): Promise<boolean> => {
     try {
-      const res = await fetch(`/api/messages/${id}`, {
+      const res = await apiFetch(`/api/messages/${id}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
@@ -352,7 +358,7 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
     if (!base64OrUrl.startsWith('data:')) return base64OrUrl;
 
     try {
-      const res = await fetch('/api/upload', {
+      const res = await apiFetch('/api/upload', {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ image: base64OrUrl }),
