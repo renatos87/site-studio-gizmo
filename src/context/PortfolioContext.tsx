@@ -136,6 +136,12 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
         } else {
           setApiAvailable(false);
         }
+        const clientsRes = await apiFetch('/api/clients', { headers: getAuthHeaders() });
+        if (clientsRes.ok) {
+          setClients(await clientsRes.json());
+        } else {
+          setApiAvailable(false);
+        }
         if (msgRes.ok) {
           setMessages(await msgRes.json());
         } else {
@@ -238,7 +244,11 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
         headers: getAuthHeaders(),
         body: JSON.stringify(projectData),
       });
-      if (!res.ok) return false;
+      if (!res.ok) {
+        const errorText = await res.text().catch(() => '');
+        showNotification(`Erro ao salvar projeto (${res.status}). ${errorText}`.trim(), 'error');
+        return false;
+      }
 
       const saved = await res.json();
       if (isEdit) {
@@ -306,7 +316,11 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
         headers: getAuthHeaders(),
         body: JSON.stringify(clientData),
       });
-      if (!res.ok) return false;
+      if (!res.ok) {
+        const errorText = await res.text().catch(() => '');
+        showNotification(`Erro ao salvar cliente (${res.status}). ${errorText}`.trim(), 'error');
+        return false;
+      }
 
       const saved = await res.json();
       if (isEdit) {
