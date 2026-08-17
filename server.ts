@@ -12,6 +12,7 @@ import {
   initialMessages,
 } from './src/data/initialData';
 import { Project, Client, ContactMessage, SiteSettings, User } from './src/types';
+import { createClient } from '@supabase/supabase-js';
 
 interface DBData {
   users: User[];
@@ -29,6 +30,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL?.trim().replace(/\/rest\/v1\/?$/, 
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const USE_SUPABASE = Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
 const SUPABASE_REST_URL = USE_SUPABASE ? `${SUPABASE_URL}/rest/v1` : '';
+const SUPABASE_STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET?.trim() || 'project-images';
 
 const dataDir = path.join(process.cwd(), 'data');
 const dbFilePath = path.join(dataDir, 'db.json');
@@ -75,6 +77,23 @@ function seedDBIfNeeded() {
 
 function toHeaderValue(body: string | undefined) {
   return body ? { 'Content-Type': 'application/json', Prefer: 'return=representation' } : { Prefer: 'return=representation' };
+}
+
+function getSupabaseAdminClient() {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return null;
+  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false },
+  });
+}
+
+function decodeBase64Image(dataUrl: string) {
+  const matches = dataUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+  if (!matches || matches.length !== 3) return null;
+  return {
+    contentType: matches[1],
+    buffer: Buffer.from(matches[2], 'base64'),
+    extension: matches[1].split('/')[1] || 'png',
+  };
 }
 
 type ProjectRow = Omit<Project, 'id' | 'clientId' | 'clientName' | 'coverImage' | 'galleryImages' | 'videoUrl' | 'externalUrl' | 'sortOrder' | 'createdAt' | 'updatedAt'> & {
@@ -787,18 +806,29 @@ async function startServer() {
         return res.json({ success: true, url: image });
       }
 
-      const matches = image.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-      if (!matches || matches.length !== 3) {
+      const decoded = decodeBase64Image(image);
+      if (!decoded) {
         return res.status(400).json({ error: 'Formato de base64 inválido.' });
       }
 
-      const ext = matches[1].split('/')[1] || 'png';
-      const buffer = Buffer.from(matches[2], 'base64');
-      const safeFilename = `img_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
-      const filePath = path.join(uploadsDir, safeFilename);
-      fs.writeFileSync(filePath, buffer);
+      const supabase = getSupabaseAdminClient();
+      if (!supabase) {
+        return res.status(500).json({ error: 'Supabase não configurado para upload de arquivos.' });
+      }
 
-      return res.json({ success: true, url: `/uploads/${safeFilename}` });
+      const fileName = `project-${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${decoded.extension}`;
+      const filePath = `uploads/${fileName}`;
+      const upload = await supabase.storage.from(SUPABASE_STORAGE_BUCKET).upload(filePath, decoded.buffer, {
+        contentType: decoded.contentType,
+        upsert: true,
+      });
+
+      if (upload.error) {
+        return res.status(500).json({ error: 'Erro ao enviar imagem para o Supabase.', details: upload.error.message });
+      }
+
+      const { data } = supabase.storage.from(SUPABASE_STORAGE_BUCKET).getPublicUrl(filePath);
+      return res.json({ success: true, url: data.publicUrl });
     } catch (error) {
       console.error('Upload error:', error);
       return res.status(500).json({ error: 'Erro ao processar upload da imagem.' });

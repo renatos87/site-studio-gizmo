@@ -9,6 +9,7 @@ import {
   initialProjects,
   initialMessages,
 } from './_shared/initialData.js';
+import { decodeBase64Image, getSupabaseAdminClient, SUPABASE_STORAGE_BUCKET } from './_shared/storage.js';
 import type { Project, Client, ContactMessage, SiteSettings, User } from '../src/types';
 
 interface DBData {
@@ -845,16 +846,29 @@ export default async function handler(req: any, res: any) {
         return sendJson(res, 200, { success: true, url: image });
       }
 
-      const matches = String(image).match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-      if (!matches || matches.length !== 3) {
+      const decoded = decodeBase64Image(String(image));
+      if (!decoded) {
         return sendJson(res, 400, { error: 'Formato de base64 inválido.' });
       }
 
-      return sendJson(res, 200, {
-        success: true,
-        url: image,
-        message: 'Imagem mantida inline como data URL.',
+      const supabase = getSupabaseAdminClient();
+      if (!supabase) {
+        return sendJson(res, 500, { error: 'Supabase não configurado para upload de arquivos.' });
+      }
+
+      const fileName = `project-${Date.now()}-${randomUUID()}.${decoded.extension}`;
+      const filePath = `uploads/${fileName}`;
+      const upload = await supabase.storage.from(SUPABASE_STORAGE_BUCKET).upload(filePath, decoded.buffer, {
+        contentType: decoded.contentType,
+        upsert: true,
       });
+
+      if (upload.error) {
+        return sendJson(res, 500, { error: 'Erro ao enviar imagem para o Supabase.', details: upload.error.message });
+      }
+
+      const { data } = supabase.storage.from(SUPABASE_STORAGE_BUCKET).getPublicUrl(filePath);
+      return sendJson(res, 200, { success: true, url: data.publicUrl });
     }
 
     return sendJson(res, 404, { error: 'Rota não encontrada.' });
