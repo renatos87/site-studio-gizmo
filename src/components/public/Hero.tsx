@@ -4,18 +4,14 @@ import { ArrowDownRight, Sparkles, MessageSquare, Award, Terminal, Compass } fro
 import { usePortfolio } from '../../context/PortfolioContext';
 
 export const Hero: React.FC = () => {
-  const { settings, setActiveSection, projects } = usePortfolio();
+  const { settings, navigateToSection, projects } = usePortfolio();
 
   const handleScrollToWorks = () => {
-    setActiveSection('works');
-    const el = document.getElementById('works');
-    if (el) el.scrollIntoView({ behavior: 'smooth' });
+    navigateToSection('works');
   };
 
   const handleScrollToContact = () => {
-    setActiveSection('contact');
-    const el = document.getElementById('contact');
-    if (el) el.scrollIntoView({ behavior: 'smooth' });
+    navigateToSection('contact');
   };
 
   const personal = settings.personalInfo || {};

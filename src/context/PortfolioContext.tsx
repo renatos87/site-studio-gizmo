@@ -13,6 +13,7 @@ interface PortfolioContextType {
   isAdmin: boolean;
   activeSection: string;
   setActiveSection: (sec: string) => void;
+  navigateToSection: (sec: string, options?: { replace?: boolean }) => void;
   selectedProject: Project | null;
   setSelectedProject: (proj: Project | null) => void;
   selectedClient: Client | null;
@@ -37,6 +38,35 @@ interface PortfolioContextType {
 }
 
 const PortfolioContext = createContext<PortfolioContextType | undefined>(undefined);
+
+const sectionPathMap: Record<string, string> = {
+  home: '/',
+  about: '/sobre',
+  works: '/trabalhos',
+  clients: '/clientes',
+  contact: '/contato',
+  admin: '/admin',
+};
+
+const pathSectionMap: Record<string, string> = Object.fromEntries(
+  Object.entries(sectionPathMap).map(([section, path]) => [path, section]),
+);
+
+function normalizePath(pathname: string) {
+  if (!pathname || pathname === '/') return '/';
+  return pathname.replace(/\/+$/, '') || '/';
+}
+
+function getSectionFromPath(pathname: string) {
+  return pathSectionMap[normalizePath(pathname)] || 'home';
+}
+
+function scrollToSection(section: string) {
+  const element = document.getElementById(section);
+  if (!element) return false;
+  element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  return true;
+}
 
 export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -81,6 +111,22 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
     setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
   };
 
+  const navigateToSection = (section: string, options?: { replace?: boolean }) => {
+    const path = sectionPathMap[section] || '/';
+    setActiveSection(section);
+
+    if (typeof window === 'undefined') return;
+
+    const method = options?.replace ? 'replaceState' : 'pushState';
+    window.history[method]({ section }, '', path);
+
+    window.requestAnimationFrame(() => {
+      if (!scrollToSection(section) && section !== 'home') {
+        document.getElementById('home')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  };
+
   const showNotification = (message: string, type: 'success' | 'error' = 'success') => {
     setNotification({ type, message });
     setTimeout(() => setNotification(null), 4000);
@@ -109,6 +155,35 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
         token,
       });
     }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const syncFromLocation = (replace = false) => {
+      const section = getSectionFromPath(window.location.pathname);
+      setActiveSection(section);
+      if (replace) {
+        window.history.replaceState({ section }, '', sectionPathMap[section] || '/');
+      }
+
+      window.requestAnimationFrame(() => {
+        scrollToSection(section);
+      });
+    };
+
+    syncFromLocation(true);
+
+    const onPopState = () => {
+      const section = getSectionFromPath(window.location.pathname);
+      setActiveSection(section);
+      window.requestAnimationFrame(() => {
+        scrollToSection(section);
+      });
+    };
+
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
   const refreshAllData = async () => {
@@ -441,6 +516,7 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
         uploadImageFile,
         refreshAllData,
         apiAvailable,
+        navigateToSection,
       }}
     >
       {children}

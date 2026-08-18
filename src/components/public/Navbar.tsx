@@ -4,7 +4,7 @@ import { Sun, Moon, Menu, X, Shield, Lock, ArrowUpRight } from 'lucide-react';
 import { usePortfolio } from '../../context/PortfolioContext';
 
 export const Navbar: React.FC = () => {
-  const { theme, toggleTheme, settings, activeSection, setActiveSection, isAdmin } = usePortfolio();
+  const { theme, toggleTheme, settings, activeSection, navigateToSection, isAdmin } = usePortfolio();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navItems = [
@@ -16,15 +16,8 @@ export const Navbar: React.FC = () => {
   ];
 
   const handleNavClick = (id: string) => {
-    setActiveSection(id);
     setMobileMenuOpen(false);
-
-    if (id === 'admin') return;
-
-    const element = document.getElementById(id);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
-    }
+    navigateToSection(id);
   };
 
   return (
